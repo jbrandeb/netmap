@@ -4,7 +4,7 @@ This file contains instructions on how to build, install and use Netmap
 on Linux.
 This directory contains Linux-specific code to let netmap work on
 Linux.
-Native support is available for r8169, ixgbe, igb, i40e, e1000, e1000e,
+Native support is available for r8169, ixgbe, igb, i40e, ice, e1000, e1000e,
 virtio-net, and forcedeth Linux drivers.
 
 Netmap relies on a kernel module (`netmap.ko`) and modified
@@ -22,7 +22,7 @@ the patches/ directory.  Common driver modifications are in the .h
 files in this directory. Note that the patches for e1000, forcedeth,
 virtio-net have been prepared on the vanilla kernel: this is usually
 sufficient for Debian/Ubuntu, but it often fails on Red Hat/CentOS.
-The patches for igb, e1000e, ixgbe and i40e, instead, are against
+The patches for igb, e1000e, ixgbe, ice and i40e, instead, are against
 a specific version of the out-of-tree Intel drivers, and should compile
 without any problem on the same systems where the original drivers do.
 
@@ -91,7 +91,7 @@ drivers usually works. In method 2 the patches will be guaranteed to
 apply, but compilation may fail since the out-of-tree drivers may
 not support your kernel.
 
-By default `e1000e`, `i40e`, `ixgbe`, `ixgbevf` and igb use method 2,
+By default `e1000e`, `i40e`, `ice`, `ixgbe`, `ixgbevf` and `igb` use method 2,
 while `e1000`, `r8169.c`, `forcedeth.c`, `veth.c` and `virtio_net.c`
 drivers use method 1\.
 The list of supported drivers can be obtained by running configure

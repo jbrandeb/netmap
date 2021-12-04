@@ -93,7 +93,7 @@ make -j $PROC_COUNT
 # Then build external intel drivers
 make distclean
 echo "Building external intel drivers (and virtio_net.c)"
-EXTDRIVERS="e1000e,igb,ixgbe,i40e"
+EXTDRIVERS="e1000e,igb,ixgbe,i40e,ice"
 # For kernels >= 3.13 we support virtio_net.c as an external driver
 cmp=$(kverless $KERNEL_VERSION 3.10)
 if [ "$cmp" == "1" ]; then
@@ -105,5 +105,5 @@ make -j $PROC_COUNT
 # Then build vanilla intel drivers
 make distclean
 echo "Building vanilla intel drivers"
-./configure --no-ext-drivers --kernel-dir=$PWD/linux-${KERNEL_VERSION} --driver-suffix=_netmap --drivers=e1000e,igb,ixgbe,i40e
+./configure --no-ext-drivers --kernel-dir=$PWD/linux-${KERNEL_VERSION} --driver-suffix=_netmap --drivers=e1000e,igb,ixgbe,i40e,ice
 make -j $PROC_COUNT

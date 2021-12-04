@@ -36,6 +36,7 @@ netmap-tmpdir
 netmap_linux_config.h
 netmap-tmp.c
 i40e*/
+ice*/
 veth.c
 failed-patches
 apps/lb/lb

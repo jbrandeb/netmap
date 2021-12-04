@@ -101,7 +101,7 @@ some netmap-enabled device drivers.
 Please look [here](LINUX/README.md) for more instructions.
 
 Make sure you have kernel headers matching your installed kernel.
-The sources for e1000e, igb, ixgbe and i40e will be downloaded
+The sources for e1000e, igb, ixgbe, ice and i40e will be downloaded
 from the Intel e1000 project on sourceforce.
 If you need the netmap enabled drivers for e1000, veth, forcedeth,
 virtio-net or r8169 you will also need the full kernel sources.
