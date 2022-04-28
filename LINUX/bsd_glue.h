@@ -148,6 +148,9 @@ struct net_device_ops {
 			NM_SET_PAGE_COUNT(&(page)[i_], 1);\
 	} while (0)
 #endif /* HAVE_SPLIT_PAGE */
+#ifndef NETMAP_LINUX_HAVE_FOLL_SPLIT
+#define FOLL_SPLIT	FOLL_SPLIT_PMD
+#endif
 
 #if !defined(NETMAP_LINUX_HAVE_NNITD) && !defined(netdev_notifier_info_to_dev)
 #define netdev_notifier_info_to_dev(ptr)	(ptr)
@@ -301,7 +304,12 @@ struct thread;
 /*
  * We hide behind the ethtool_ops
  */
-int linux_netmap_set_ringparam(struct net_device *, struct ethtool_ringparam *);
+int linux_netmap_set_ringparam(struct net_device *, struct ethtool_ringparam *
+#ifdef NETMAP_LINUX_HAVE_SETRNGPRM_4ARGS
+		, struct kernel_ethtool_ringparam *
+		, struct netlink_ext_ack *
+#endif /* NETMAP_LINUX_HAVE_SETRNGPRM_4ARGS */
+		);
 struct netmap_linux_magic {
 	struct ethtool_ops eto;
 	const struct ethtool_ops *save_eto;
@@ -349,7 +357,6 @@ netdev_tx_t linux_netmap_start_xmit(struct sk_buff *, struct net_device *);
 int linux_netmap_change_mtu(struct net_device *dev, int new_mtu);
 
 /* prevent ring params change while in netmap mode */
-int linux_netmap_set_ringparam(struct net_device *, struct ethtool_ringparam *);
 #ifdef NETMAP_LINUX_HAVE_SET_CHANNELS
 int linux_netmap_set_channels(struct net_device *, struct ethtool_channels *);
 #endif
@@ -487,6 +494,7 @@ struct timeval {
  * windows: they are emulated via get/setsockopt
  */
 #define CTLFLAG_RD              1
+#define CTLFLAG_RDTUN           CTLFLAG_RD
 #define CTLFLAG_RW              2
 
 struct sysctl_oid;

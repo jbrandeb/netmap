@@ -541,7 +541,7 @@ SYSBEGIN(main_init);
 
 SYSCTL_DECL(_dev_netmap);
 SYSCTL_NODE(_dev, OID_AUTO, netmap, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
-    "Netmap args");
+		"Netmap args");
 SYSCTL_INT(_dev_netmap, OID_AUTO, verbose,
 		CTLFLAG_RW, &netmap_verbose, 0, "Verbose mode");
 #ifdef CONFIG_NETMAP_DEBUG
@@ -2654,7 +2654,7 @@ netmap_do_regif(struct netmap_priv_d *priv, struct netmap_adapter *na,
 	 */
 	netmap_update_hostrings_mode(na);
 
-	if (nm_kring_pending(priv)) {
+	if (na->active_fds == 0 || nm_kring_pending(priv)) {
 		/* Some kring is switching mode, tell the adapter to
 		 * react on this. */
 		netmap_set_all_rings(na, NM_KR_LOCKED);
@@ -3374,7 +3374,6 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 	int error = 0;
 	char *ker = NULL, *p;
 	struct nmreq_option **next, *src, **opt_tab;
-	struct nmreq_option buf;
 	uint64_t *ptrs;
 
 	if (hdr->nr_reserved) {
@@ -3404,29 +3403,14 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		goto out_err;
 	}
 
-	bufsz = 2 * sizeof(void *) + rqsz +
-		NETMAP_REQ_OPT_MAX * sizeof(opt_tab);
-	/* compute the size of the buf below the option table.
-	 * It must contain a copy of every received option structure.
-	 * For every option we also need to store a copy of the user
-	 * list pointer.
+	/*
+	 * The buffer size must be large enough to store the request body,
+	 * all the possible options and the additional user pointers
+	 * (2+NETMAP_REQ_OPT_MAX). Note that the maximum size of body plus
+	 * options can not exceed NETMAP_REQ_MAXSIZE;
 	 */
-	optsz = 0;
-	for (src = (struct nmreq_option *)(uintptr_t)hdr->nr_options; src;
-	     src = (struct nmreq_option *)(uintptr_t)buf.nro_next)
-	{
-		error = copyin(src, &buf, sizeof(*src));
-		if (error)
-			goto out_err;
-		optsz += sizeof(*src);
-		optsz += nmreq_opt_size_by_type(buf.nro_reqtype, buf.nro_size);
-		if (rqsz + optsz > NETMAP_REQ_MAXSIZE) {
-			error = EMSGSIZE;
-			goto out_err;
-		}
-		bufsz += sizeof(void *);
-	}
-	bufsz += optsz;
+	bufsz = (2 + NETMAP_REQ_OPT_MAX) * sizeof(void *) + NETMAP_REQ_MAXSIZE +
+		NETMAP_REQ_OPT_MAX * sizeof(opt_tab);
 
 	ker = nm_os_malloc(bufsz);
 	if (ker == NULL) {
@@ -3464,6 +3448,7 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		error = copyin(src, opt, sizeof(*src));
 		if (error)
 			goto out_restore;
+		rqsz += sizeof(*src);
 		/* make a copy of the user next pointer */
 		*ptrs = opt->nro_next;
 		/* overwrite the user pointer with the in-kernel one */
@@ -3507,6 +3492,14 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		/* copy the option body */
 		optsz = nmreq_opt_size_by_type(opt->nro_reqtype,
 						opt->nro_size);
+		/* check optsz and nro_size to avoid for possible integer overflows of rqsz */
+		if ((optsz > NETMAP_REQ_MAXSIZE) || (opt->nro_size > NETMAP_REQ_MAXSIZE)
+				|| (rqsz + optsz > NETMAP_REQ_MAXSIZE)
+				|| (optsz > 0 && rqsz + optsz <= rqsz)) {
+			error = EMSGSIZE;
+			goto out_restore;
+		}
+		rqsz += optsz;
 		if (optsz) {
 			/* the option body follows the option header */
 			error = copyin(src + 1, p, optsz);
