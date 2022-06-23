@@ -1,5 +1,5 @@
 diff --git a/ice/Makefile b/ice/Makefile
-index a98dd4c..8b64fcc 100644
+index 789a908..cdb3394 100644
 --- a/ice/Makefile
 +++ b/ice/Makefile
 @@ -26,9 +26,9 @@ ifneq ($(KERNELRELEASE),)
@@ -14,7 +14,7 @@ index a98dd4c..8b64fcc 100644
  	 ice_controlq.o	\
  	 ice_common.o	\
  	 ice_nvm.o	\
-@@ -56,26 +56,26 @@ ice-y := ice_main.o	\
+@@ -57,32 +57,33 @@ ice-y := ice_main.o	\
  	 ice_fwlog.o		\
  	 ice_ieps.o		\
  	 ice_ethtool.o
@@ -25,12 +25,7 @@ index a98dd4c..8b64fcc 100644
 -ice-$(CONFIG_PCI_IOV) += ice_virtchnl_allowlist.o
 -ice-$(CONFIG_PCI_IOV) += ice_dcf.o
 -ice-$(CONFIG_PCI_IOV) += ice_virtchnl_fdir.o
--ice-$(CONFIG_PCI_IOV) += ice_virtchnl_pf.o ice_vf_mbx.o ice_vf_vsi_vlan_ops.o
--ice-$(CONFIG_PTP_1588_CLOCK:m=y) += ice_ptp.o ice_ptp_hw.o
--ice-$(CONFIG_DCB) += ice_dcb.o ice_dcb_nl.o ice_dcb_lib.o
--ice-$(CONFIG_RFS_ACCEL) += ice_arfs.o
--ice-$(CONFIG_XDP_SOCKETS) += ice_xsk.o
--ice-y += kcompat.o
+-ice-$(CONFIG_PCI_IOV) +=	\
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_NET_DEVLINK:m=y) += ice_devlink.o ice_fw_update.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_NET_DEVLINK:m=y) += ice_eswitch.o ice_repr.o
 +ice$(NETMAP_DRIVER_SUFFIX)-y += ice_idc.o
@@ -38,9 +33,21 @@ index a98dd4c..8b64fcc 100644
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_PCI_IOV) += ice_virtchnl_allowlist.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_PCI_IOV) += ice_dcf.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_PCI_IOV) += ice_virtchnl_fdir.o
-+ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_PCI_IOV) += ice_virtchnl_pf.o ice_vf_mbx.o ice_vf_vsi_vlan_ops.o
++ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_PCI_IOV) +=	\
+ 	ice_sriov.o		\
+ 	ice_vf_mbx.o		\
+ 	ice_vf_vsi_vlan_ops.o	\
+ 	ice_vf_adq.o		\
+ 	ice_virtchnl.o		\
+ 	ice_vf_lib.o
+-ice-$(CONFIG_PTP_1588_CLOCK:m=y) += ice_ptp.o ice_ptp_hw.o
+-ice-$(CONFIG_DCB) += ice_dcb.o ice_dcb_nl.o ice_dcb_lib.o
+-ice-$(CONFIG_RFS_ACCEL) += ice_arfs.o
+-ice-$(CONFIG_XDP_SOCKETS) += ice_xsk.o
+-ice-y += kcompat.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_PTP_1588_CLOCK:m=y) += ice_ptp.o ice_ptp_hw.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_DCB) += ice_dcb.o ice_dcb_nl.o ice_dcb_lib.o
++ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_RFS_ACCEL) += ice_arfs.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_RFS_ACCEL) += ice_arfs.o
 +ice$(NETMAP_DRIVER_SUFFIX)-$(CONFIG_XDP_SOCKETS) += ice_xsk.o
 +ice$(NETMAP_DRIVER_SUFFIX)-y += kcompat.o
@@ -56,7 +63,7 @@ index a98dd4c..8b64fcc 100644
  endif
  
  ifeq (${NEED_AUX_BUS},2)
-@@ -85,7 +85,7 @@ endif
+@@ -92,7 +93,7 @@ endif
  else	# ifneq($(KERNELRELEASE),)
  # normal makefile
  
@@ -65,7 +72,7 @@ index a98dd4c..8b64fcc 100644
  
  COMMON_MK ?= $(wildcard common.mk)
  ifeq (${COMMON_MK},)
-@@ -112,7 +112,7 @@ endif
+@@ -119,7 +120,7 @@ endif
  
  all:
  	+$(call kernelbuild,modules)
@@ -75,12 +82,12 @@ index a98dd4c..8b64fcc 100644
  	$(MAKE) -C lttng
  endif
 diff --git a/ice/ice_base.c b/ice/ice_base.c
-index 9f2320f..9f9126a 100644
+index adaaa84..b281b6b 100644
 --- a/ice/ice_base.c
 +++ b/ice/ice_base.c
 @@ -6,6 +6,11 @@
  #include "ice_dcb_lib.h"
- #include "ice_virtchnl_pf.h"
+ #include "ice_sriov.h"
  
 +#if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
 +#define NETMAP_ICE_BASE
@@ -90,7 +97,7 @@ index 9f2320f..9f9126a 100644
  /**
   * __ice_vsi_get_qs_contig - Assign a contiguous chunk of queues to VSI
   * @qs_cfg: gathered variables needed for PF->VSI queues assignment
-@@ -448,6 +453,10 @@ static int ice_setup_rx_ctx(struct ice_ring *ring)
+@@ -459,6 +464,10 @@ static int ice_setup_rx_ctx(struct ice_ring *ring)
  	/* Rx queue threshold in units of 64 */
  	rlan_ctx.lrxqthresh = 1;
  
@@ -101,7 +108,7 @@ index 9f2320f..9f9126a 100644
  	/* Enable Flexible Descriptors in the queue context which
  	 * allows this driver to select a specific receive descriptor format
  	 * increasing context priority to pick up profile ID; default is 0x01;
-@@ -601,6 +610,11 @@ int ice_vsi_cfg_rxq(struct ice_ring *ring)
+@@ -615,6 +624,11 @@ int ice_vsi_cfg_rxq(struct ice_ring *ring)
  		return 0;
  	}
  #endif /* HAVE_AF_XDP_ZC_SUPPORT */
@@ -113,7 +120,7 @@ index 9f2320f..9f9126a 100644
  
  	ice_alloc_rx_bufs(ring, num_bufs);
  
-@@ -871,6 +885,11 @@ ice_vsi_cfg_txq(struct ice_vsi *vsi, struct ice_ring *ring,
+@@ -885,6 +899,11 @@ ice_vsi_cfg_txq(struct ice_vsi *vsi, struct ice_ring *ring,
  	txq = &qg_buf->txqs[0];
  	if (pf_q == le16_to_cpu(txq->txq_id))
  		ring->txq_teid = le32_to_cpu(txq->q_teid);
@@ -126,10 +133,10 @@ index 9f2320f..9f9126a 100644
  	return 0;
  }
 diff --git a/ice/ice_main.c b/ice/ice_main.c
-index 97e754b..4eeb305 100644
+index e00d7f8..9438f93 100644
 --- a/ice/ice_main.c
 +++ b/ice/ice_main.c
-@@ -103,6 +103,12 @@ static unsigned long fwlog_events; /* no enabled events by default */
+@@ -104,6 +104,11 @@ static unsigned long fwlog_events; /* no enabled events by default */
  module_param(fwlog_events, ulong, 0644);
  MODULE_PARM_DESC(fwlog_events, "FW events to log (32-bit mask)\n");
  
@@ -138,21 +145,21 @@ index 97e754b..4eeb305 100644
 +#include <ice_netmap_linux.h>
 +#endif
 +
+ /**
+  * ice_hw_to_dev - Get device pointer from the hardware structure
+  * @hw: pointer to the device HW structure
+@@ -5990,6 +5995,10 @@ probe_done:
+ #ifdef HAVE_DEVLINK_NOTIFY_REGISTER
+ 	ice_devlink_register(pf);
+ #endif /* HAVE_DEVLINK_NOTIFY_REGISTER */
 +
- static struct workqueue_struct *ice_wq;
- 
- static const struct net_device_ops ice_netdev_recovery_ops;
-@@ -6169,6 +6175,9 @@ probe_done:
- 		dev_warn(dev, "Aux drivers are not supported on this device\n");
- 	}
- 
 +#ifdef DEV_NETMAP
 +	ice_netmap_attach(pf);
 +#endif
  	return 0;
  
  	/* Unwind non-managed device resources, etc. if something failed */
-@@ -6279,6 +6288,10 @@ static void ice_remove(struct pci_dev *pdev)
+@@ -6106,6 +6115,10 @@ static void ice_remove(struct pci_dev *pdev)
  	if (!pf)
  		return;
  
@@ -164,7 +171,7 @@ index 97e754b..4eeb305 100644
  	 * driver transitions to recovery mode. If this is not set
  	 * it means that the driver went into recovery mode on load.
 diff --git a/ice/ice_txrx.c b/ice/ice_txrx.c
-index 037cc5a..899ee4c 100644
+index 68e659d..cb048fe 100644
 --- a/ice/ice_txrx.c
 +++ b/ice/ice_txrx.c
 @@ -30,6 +30,10 @@
@@ -189,7 +196,7 @@ index 037cc5a..899ee4c 100644
  
  	/* get the bql data ready */
  #ifdef HAVE_XDP_SUPPORT
-@@ -1481,6 +1489,17 @@ int ice_clean_rx_irq(struct ice_ring *rx_ring, int budget)
+@@ -1472,6 +1480,17 @@ int ice_clean_rx_irq(struct ice_ring *rx_ring, int budget)
  	struct xdp_buff xdp;
  	bool failure;
  
